@@ -1,39 +1,66 @@
 name: Release
 
-# Pushing a tag such as v1.0.0 tests, builds and publishes a GitHub release.
+# Publishes a GitHub release for the version in internal/version/version.go.
+#
+# It runs when the default branch is updated (so merging a version bump
+# releases it), when a v* tag is pushed, or when started by hand. If a release
+# for that version already exists, nothing is published. When the tag does not
+# exist yet, it is created on the commit being released.
 on:
   push:
+    branches: [rom]
     tags: ["v*"]
+  workflow_dispatch:
 
 permissions:
   contents: write
 
+concurrency:
+  group: release
+  cancel-in-progress: false
+
 jobs:
   release:
     runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
         with:
           go-version-file: go.mod
-      - name: Check that the tag matches the version in the code
+      - name: Decide whether to release
+        id: plan
         run: |
-          code="$(make -s version)"
-          if [ "$code" != "$GITHUB_REF_NAME" ]; then
-            echo "tag $GITHUB_REF_NAME does not match internal/version ($code)" >&2
+          version="$(make -s version)"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          if [ "$GITHUB_REF_TYPE" = tag ] && [ "$GITHUB_REF_NAME" != "$version" ]; then
+            echo "tag $GITHUB_REF_NAME does not match internal/version ($version)" >&2
             exit 1
           fi
+          if ! grep -qx "## $version" CHANGELOG.md; then
+            echo "CHANGELOG.md has no section for $version" >&2
+            exit 1
+          fi
+          if gh release view "$version" >/dev/null 2>&1; then
+            echo "release $version already exists - nothing to do"
+            echo "publish=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "publish=true" >> "$GITHUB_OUTPUT"
+          fi
       - name: Test
+        if: steps.plan.outputs.publish == 'true'
         run: make test
       - name: Build release archives
+        if: steps.plan.outputs.publish == 'true'
         run: make dist
-      - name: Release notes
-        run: awk -v v="## $GITHUB_REF_NAME" '$0==v{on=1;next} /^## /{on=0} on' CHANGELOG.md > notes.md
       - name: Publish
+        if: steps.plan.outputs.publish == 'true'
         env:
-          GH_TOKEN: ${{ github.token }}
-        run: >
-          gh release create "$GITHUB_REF_NAME"
-          dist/*.tar.gz dist/*.zip dist/checksums.txt
-          --title "Stars n Asteroids $GITHUB_REF_NAME"
-          --notes-file notes.md --verify-tag
+          VERSION: ${{ steps.plan.outputs.version }}
+        run: |
+          awk -v v="## $VERSION" '$0==v{on=1;next} /^## /{on=0} on' CHANGELOG.md > notes.md
+          gh release create "$VERSION" dist/*.tar.gz dist/*.zip dist/checksums.txt \
+            --target "$GITHUB_SHA" \
+            --title "Stars n Asteroids $VERSION" \
+            --notes-file notes.md

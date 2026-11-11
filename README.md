@@ -61,9 +61,11 @@ Pre-built servers for Linux, macOS and Windows are attached to each
 [GitHub release](../../releases). Unpack one and run `stars_n_asteroids`; the
 game client is embedded in the binary.
 
-To cut a release: set `Version` in `internal/version/version.go`, add a section
-to `CHANGELOG.md`, and push a matching tag. The release workflow tests,
-cross-compiles (`make dist`) and publishes.
+To cut a release: set `Version` in `internal/version/version.go`, add a matching
+section to `CHANGELOG.md`, and merge to the default branch. The release workflow
+then tests, cross-compiles (`make dist`), creates the tag and publishes the
+release. Pushing a matching `v*` tag, or starting the workflow by hand, does
+the same; a version that is already released is left alone.
 
 ## How to play
 
