@@ -26,15 +26,18 @@ const (
 var actNames = [numActions]string{"left", "right", "thrust", "fire", "bomb", "jump", "pause", "mute"}
 var actLabels = [numActions]string{"Rotate left", "Rotate right", "Thrust", "Fire", "Nova bomb", "Space jump", "Pause", "Mute"}
 
-var defaultKeys = [numActions][2]string{
-	{"ArrowLeft", "KeyA"},
-	{"ArrowRight", "KeyD"},
-	{"ArrowUp", "KeyW"},
-	{"Space", "KeyK"},
-	{"KeyB", "ShiftLeft"},
-	{"KeyJ", "ArrowDown"},
-	{"KeyP", ""},
-	{"KeyM", ""},
+// keySlots is the number of keys that can be bound to one action.
+const keySlots = 3
+
+var defaultKeys = [numActions][keySlots]string{
+	{"ArrowLeft", "KeyA", ""},
+	{"ArrowRight", "KeyD", ""},
+	{"ArrowUp", "KeyW", ""},
+	{"Space", "KeyK", ""},
+	{"KeyB", "ShiftLeft", "ShiftRight"},
+	{"KeyJ", "ArrowDown", ""},
+	{"KeyP", "", ""},
+	{"KeyM", "", ""},
 }
 
 // keyLabel turns a KeyboardEvent.code into something short and readable.
@@ -145,7 +148,7 @@ func validColor(s string) bool {
 
 type settings struct {
 	diff   int
-	keys   [numActions][2]string
+	keys   [numActions][keySlots]string
 	colors [numColors]string
 }
 
@@ -176,7 +179,7 @@ func loadSettings() {
 				if pair.Type() != js.TypeObject {
 					continue
 				}
-				for slot := 0; slot < 2; slot++ {
+				for slot := 0; slot < keySlots; slot++ {
 					if v := pair.Index(slot); v.Type() == js.TypeString && len(v.String()) <= 32 {
 						cfg.keys[a][slot] = v.String()
 					}
@@ -196,7 +199,7 @@ func loadSettings() {
 func saveSettings() {
 	keys := map[string]any{}
 	for a, pair := range cfg.keys {
-		keys[actNames[a]] = []any{pair[0], pair[1]}
+		keys[actNames[a]] = []any{pair[0], pair[1], pair[2]}
 	}
 	colors := make([]any, numColors)
 	for i, c := range cfg.colors {
@@ -228,7 +231,7 @@ func bind(a action, slot int, code string) {
 
 func isBound(code string) bool {
 	for _, pair := range cfg.keys {
-		if pair[0] == code || pair[1] == code {
+		if pair[0] == code || pair[1] == code || pair[2] == code {
 			return true
 		}
 	}
@@ -244,7 +247,7 @@ var (
 
 	settingsEl, gearBtn, themeSel, diffInfo js.Value
 	diffBtns                                []js.Value
-	keyBtns                                 [numActions][2]js.Value
+	keyBtns                                 [numActions][keySlots]js.Value
 	colorInputs                             [numColors]js.Value
 	gearShown                               bool
 )
@@ -283,7 +286,7 @@ func setupSettings() {
 	rows := doc.Call("getElementById", "keyRows")
 	for a := action(0); a < numActions; a++ {
 		rows.Call("appendChild", el("span", "lbl", actLabels[a]))
-		for slot := 0; slot < 2; slot++ {
+		for slot := 0; slot < keySlots; slot++ {
 			b := el("button", "key", "")
 			b.Set("type", "button")
 			listen(b, "click", func(js.Value) {

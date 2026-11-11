@@ -61,7 +61,7 @@ deploy. Options:
 | ← → / A D           | rotate            |
 | ↑ / W               | thrust            |
 | Space / K           | fire              |
-| B / Left Shift      | nova bomb         |
+| B / either Shift    | nova bomb         |
 | J / ↓               | space jump        |
 | P / Esc             | pause             |
 | M                   | mute              |
@@ -93,7 +93,7 @@ saved in the browser.
   count and guardian toughness. Harder settings pay more (x0.5 up to x3), and the
   difficulty is shown next to each high score. A change made while paused
   applies to the next game.
-* **Controls** – two key slots per action. Click a slot and press the new key;
+* **Controls** – three key slots per action. Click a slot and press the new key;
   a key already in use is taken from its old action.
 * **Colours** – ship, shots, each asteroid kind, enemies and stars, with presets
   (default, neon, retro phosphor, colour-blind friendly, monochrome).
