@@ -10,9 +10,11 @@ import (
 	"io/fs"
 	"log"
 	"mime"
+	"net"
 	"net/http"
 	"os"
 	"path"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -135,11 +137,16 @@ func newMux(store *scores.Store, static fs.FS) *http.ServeMux {
 }
 
 func main() {
-	defAddr := ":8080"
+	defPort := 8080
 	if p := os.Getenv("PORT"); p != "" {
-		defAddr = ":" + p
+		n, err := strconv.Atoi(p)
+		if err != nil {
+			log.Fatalf("invalid PORT environment variable %q", p)
+		}
+		defPort = n
 	}
-	addr := flag.String("addr", defAddr, "listen address")
+	port := flag.Int("port", defPort, "TCP port to listen on (default from $PORT, else 8080)")
+	host := flag.String("host", "", "interface to listen on (default: all interfaces)")
 	data := flag.String("data", "data/scores.json", "high-score file")
 	dir := flag.String("web", "", "serve client files from this directory instead of the embedded copy (development)")
 	flag.Parse()
@@ -156,11 +163,20 @@ func main() {
 		log.Print("warning: game.wasm not found - run `make wasm` and rebuild")
 	}
 
+	if *port < 1 || *port > 65535 {
+		log.Fatalf("invalid port %d: must be between 1 and 65535", *port)
+	}
+	addr := net.JoinHostPort(*host, strconv.Itoa(*port))
+	shown := *host
+	if shown == "" {
+		shown = "localhost"
+	}
+
 	srv := &http.Server{
-		Addr:              *addr,
+		Addr:              addr,
 		Handler:           newMux(store, static),
 		ReadHeaderTimeout: 10 * time.Second,
 	}
-	log.Printf("Stars n Asteroids listening on http://localhost%s", *addr)
+	log.Printf("Stars n Asteroids listening on http://%s", net.JoinHostPort(shown, strconv.Itoa(*port)))
 	log.Fatal(srv.ListenAndServe())
 }

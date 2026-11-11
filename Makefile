@@ -1,4 +1,5 @@
 GOROOT := $(shell go env GOROOT)
+PORT ?= 8080
 
 .PHONY: all build wasm server run test clean
 
@@ -14,7 +15,7 @@ server: wasm
 	go build -o bin/server ./cmd/server
 
 run: build
-	./bin/server
+	./bin/server -port $(PORT)
 
 test:
 	go test ./...

@@ -22,7 +22,13 @@ Requires Go 1.24+.
 make run
 ```
 
-then open <http://localhost:8080>. Without `make`:
+then open <http://localhost:8080>. To use another port:
+
+```bash
+make run PORT=9000
+```
+
+Without `make`:
 
 ```bash
 GOOS=js GOARCH=wasm go build -o web/static/game.wasm ./cmd/game
@@ -33,7 +39,7 @@ cp "$(go env GOROOT)/lib/wasm/wasm_exec.js" web/static/
 ```
 
 ```bash
-go run ./cmd/server
+go run ./cmd/server -port 9000
 ```
 
 The client is embedded in the server binary, so `bin/server` is all you need to
@@ -41,7 +47,8 @@ deploy. Options:
 
 | Flag    | Default            | Meaning                                              |
 |---------|--------------------|------------------------------------------------------|
-| `-addr` | `:8080` (or `$PORT`) | listen address                                     |
+| `-port` | `8080` (or `$PORT`) | TCP port to listen on                               |
+| `-host` | *(all interfaces)* | interface to bind, e.g. `127.0.0.1`                  |
 | `-data` | `data/scores.json` | high-score file                                      |
 | `-web`  | *(embedded)*       | serve client files from a directory (for development) |
 
