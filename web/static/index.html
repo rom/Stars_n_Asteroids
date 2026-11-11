@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>Stars n Asteroids</title>
+<style>
+  html, body { margin: 0; height: 100%; background: #02030a; overflow: hidden; color: #cfe6ff;
+    font-family: "Trebuchet MS", "Segoe UI", system-ui, sans-serif; touch-action: none; user-select: none; -webkit-user-select: none; }
+  #stage { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; }
+  canvas { display: block; background: #000; box-shadow: 0 0 60px rgba(60, 140, 255, .25); }
+  #loading { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; letter-spacing: .3em; font-size: 14px; }
+  #overlay { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; background: rgba(2, 3, 10, .6); }
+  #overlay.hidden, #loading.hidden { display: none; }
+  #nameForm { background: #0b1226; border: 2px solid #39d5ff; border-radius: 14px; padding: 22px 26px; text-align: center;
+    box-shadow: 0 0 40px rgba(57, 213, 255, .35); max-width: 90vw; }
+  #nameForm h2 { margin: 0 0 6px; color: #ffd84a; letter-spacing: .12em; font-size: 20px; }
+  #nameForm p { margin: 0 0 14px; font-size: 14px; opacity: .85; }
+  #nameInput { font: inherit; font-size: 22px; width: 11em; max-width: 100%; box-sizing: border-box; text-align: center; padding: 8px;
+    color: #fff; background: #050a18; border: 1px solid #39d5ff; border-radius: 8px; outline: none; user-select: text; -webkit-user-select: text; }
+  #nameForm .row { margin-top: 14px; display: flex; gap: 10px; justify-content: center; }
+  #nameForm button { font: inherit; font-weight: bold; letter-spacing: .1em; padding: 9px 18px; border-radius: 8px; cursor: pointer;
+    border: 1px solid #39d5ff; background: #39d5ff; color: #04101f; }
+  #nameForm button.ghost { background: transparent; color: #9fc4e8; border-color: #44597a; }
+  #touch { display: none; }
+  @media (pointer: coarse) {
+    #touch { display: block; }
+    .tb { position: fixed; bottom: 18px; width: 68px; height: 68px; border-radius: 50%; border: 2px solid rgba(160, 215, 255, .55);
+      background: rgba(40, 90, 150, .28); color: #dff1ff; font-size: 26px; display: flex; align-items: center; justify-content: center; }
+    .tb.on { background: rgba(57, 213, 255, .5); }
+    .tb.small { width: 52px; height: 52px; font-size: 15px; bottom: 100px; }
+  }
+</style>
+</head>
+<body>
+<div id="stage"><canvas id="game" width="1280" height="720"></canvas></div>
+<div id="loading">LOADING…</div>
+
+<div id="overlay" class="hidden">
+  <form id="nameForm" autocomplete="off">
+    <h2 id="entryTitle">HIGH SCORE</h2>
+    <p id="entryText">Enter your name, pilot</p>
+    <input id="nameInput" maxlength="12" spellcheck="false" autocapitalize="characters" enterkeyhint="done">
+    <div class="row">
+      <button type="submit">SAVE</button>
+      <button type="button" class="ghost" id="skipBtn">SKIP</button>
+    </div>
+  </form>
+</div>
+
+<div id="touch">
+  <div class="tb" data-key="ArrowLeft" style="left:16px">◀</div>
+  <div class="tb" data-key="ArrowRight" style="left:98px">▶</div>
+  <div class="tb small" data-key="KeyB" style="right:24px">BOMB</div>
+  <div class="tb" data-key="ArrowUp" style="right:98px">▲</div>
+  <div class="tb" data-key="Space" style="right:16px">●</div>
+</div>
+
+<script src="wasm_exec.js"></script>
+<script>
+(async () => {
+  const loading = document.getElementById("loading");
+  try {
+    const go = new Go();
+    const res = await fetch("game.wasm");
+    if (!res.ok) throw new Error("game.wasm: HTTP " + res.status);
+    const { instance } = await WebAssembly.instantiate(await res.arrayBuffer(), go.importObject);
+    loading.classList.add("hidden");
+    await go.run(instance);
+  } catch (err) {
+    loading.classList.remove("hidden");
+    loading.textContent = "Failed to start: " + err.message;
+    console.error(err);
+  }
+})();
+</script>
+</body>
+</html>
