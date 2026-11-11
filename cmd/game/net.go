@@ -8,6 +8,7 @@ import "syscall/js"
 type scoreRow struct {
 	name         string
 	score, level int
+	diff         string
 }
 
 var (
@@ -30,7 +31,11 @@ var (
 		rows := make([]scoreRow, 0, list.Length())
 		for i := 0; i < list.Length(); i++ {
 			e := list.Index(i)
-			rows = append(rows, scoreRow{e.Get("name").String(), e.Get("score").Int(), e.Get("level").Int()})
+			row := scoreRow{name: e.Get("name").String(), score: e.Get("score").Int(), level: e.Get("level").Int(), diff: "normal"}
+			if d := e.Get("difficulty"); d.Type() == js.TypeString {
+				row.diff = d.String()
+			}
+			rows = append(rows, row)
 		}
 		g.scores = rows
 		g.scoresErr = false
@@ -50,8 +55,8 @@ func fetchScores() {
 	win.Call("fetch", "api/scores").Call("then", toJSON).Call("then", gotScores).Call("catch", netFail)
 }
 
-func postScore(name string, score, level int) {
-	body := win.Get("JSON").Call("stringify", map[string]any{"name": name, "score": score, "level": level})
+func postScore(name string, score, level int, diff string) {
+	body := win.Get("JSON").Call("stringify", map[string]any{"name": name, "score": score, "level": level, "difficulty": diff})
 	win.Call("fetch", "api/scores", map[string]any{
 		"method":  "POST",
 		"headers": map[string]any{"Content-Type": "application/json"},
@@ -71,7 +76,7 @@ func setupEntryForm() {
 			return
 		}
 		try(func() { win.Get("localStorage").Call("setItem", "sna-name", name) })
-		postScore(name, g.score, g.reached)
+		postScore(name, g.score, g.reached, g.diff.id)
 		closeEntry(false)
 	})
 	listen(doc.Call("getElementById", "skipBtn"), "click", func(js.Value) { closeEntry(true) })

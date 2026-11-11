@@ -6,6 +6,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"slices"
 	"sort"
 	"strings"
 	"sync"
@@ -20,12 +21,17 @@ const (
 	keep     = 100 // entries retained on disk
 )
 
+// Difficulties lists the accepted difficulty identifiers, easiest first.
+var Difficulties = []string{"supereasy", "easy", "normal", "hard", "superhard", "insane"}
+
 // Entry is one row of the high-score table.
 type Entry struct {
-	Name  string    `json:"name"`
-	Score int       `json:"score"`
-	Level int       `json:"level"`
-	Date  time.Time `json:"date"`
+	Name  string `json:"name"`
+	Score int    `json:"score"`
+	Level int    `json:"level"`
+	// Difficulty is one of Difficulties; empty in old files means "normal".
+	Difficulty string    `json:"difficulty,omitempty"`
+	Date       time.Time `json:"date"`
 }
 
 // Store is a concurrency-safe high-score table, optionally backed by a JSON file.
@@ -90,8 +96,15 @@ func CleanName(name string) (string, error) {
 }
 
 // Add validates and inserts a score. It returns the 1-based rank of the new
-// entry (0 if it did not make the retained table).
-func (s *Store) Add(name string, score, level int) (int, error) {
+// entry (0 if it did not make the retained table). An empty difficulty means
+// "normal".
+func (s *Store) Add(name string, score, level int, difficulty string) (int, error) {
+	if difficulty == "" {
+		difficulty = "normal"
+	}
+	if !slices.Contains(Difficulties, difficulty) {
+		return 0, errors.New("unknown difficulty")
+	}
 	name, err := CleanName(name)
 	if err != nil {
 		return 0, err
@@ -102,7 +115,7 @@ func (s *Store) Add(name string, score, level int) (int, error) {
 	if level < 1 || level > MaxLevel {
 		return 0, errors.New("level out of range")
 	}
-	e := Entry{Name: name, Score: score, Level: level, Date: time.Now().UTC()}
+	e := Entry{Name: name, Score: score, Level: level, Difficulty: difficulty, Date: time.Now().UTC()}
 
 	s.mu.Lock()
 	defer s.mu.Unlock()

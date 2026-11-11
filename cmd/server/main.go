@@ -26,9 +26,10 @@ import (
 const topN = 10
 
 type scoreReq struct {
-	Name  string `json:"name"`
-	Score int    `json:"score"`
-	Level int    `json:"level"`
+	Name       string `json:"name"`
+	Score      int    `json:"score"`
+	Level      int    `json:"level"`
+	Difficulty string `json:"difficulty"`
 }
 
 type scoreResp struct {
@@ -56,7 +57,7 @@ func scoresHandler(store *scores.Store) http.HandlerFunc {
 				writeJSON(w, http.StatusBadRequest, scoreResp{Scores: store.Top(topN), Error: "invalid JSON"})
 				return
 			}
-			rank, err := store.Add(req.Name, req.Score, req.Level)
+			rank, err := store.Add(req.Name, req.Score, req.Level, req.Difficulty)
 			if err != nil {
 				writeJSON(w, http.StatusBadRequest, scoreResp{Scores: store.Top(topN), Error: err.Error()})
 				return

@@ -56,14 +56,16 @@ deploy. Options:
 
 ## How to play
 
-| Key                 | Action            |
+| Default keys        | Action            |
 |---------------------|-------------------|
 | ← → / A D           | rotate            |
 | ↑ / W               | thrust            |
-| Space               | fire              |
-| B / X / Shift       | nova bomb         |
+| Space / K           | fire              |
+| B / Left Shift      | nova bomb         |
+| J / ↓               | space jump        |
 | P / Esc             | pause             |
 | M                   | mute              |
+| O                   | settings (title screen or while paused) |
 
 Touch devices get on-screen buttons.
 
@@ -74,17 +76,36 @@ Touch devices get on-screen buttons.
   multiplier (up to x9); losing a ship resets it.
 * **Drones** shoot, **hunters** ram. They drop power-ups: **T**riple shot,
   **R**apid fire, **S**hield and nova **B**ombs.
+* **Space jump** wormholes the ship to a spot on screen with nothing near it
+  (rocks, enemies, shots, blasts or loot). You arrive at rest, and the jump
+  drive needs 5 seconds to recharge – the bar in the bottom-right corner shows it.
 * An extra ship every 30,000 points.
 * Clear a level by destroying everything. Levels 7, 14, 21, 28 and 35 are
   guardian fights.
+
+## Settings
+
+Press **O** or the ⚙ button on the title screen (or while paused). Settings are
+saved in the browser.
+
+* **Difficulty** – super easy, easy, normal, hard, super hard, insane. It changes
+  starting ships and bombs, hostile speed, enemy fire rate and shot speed, rock
+  count and guardian toughness. Harder settings pay more (x0.5 up to x3), and the
+  difficulty is shown next to each high score. A change made while paused
+  applies to the next game.
+* **Controls** – two key slots per action. Click a slot and press the new key;
+  a key already in use is taken from its old action.
+* **Colours** – ship, shots, each asteroid kind, enemies and stars, with presets
+  (default, neon, retro phosphor, colour-blind friendly, monochrome).
 
 Append `?level=N` to the URL for a practice run starting at level N (practice
 scores are not ranked).
 
 ## High-score API
 
-* `GET /api/scores` → `{"scores":[{"name","score","level","date"}, …]}` (top 10)
-* `POST /api/scores` with `{"name","score","level"}` → `{"rank":N,"scores":[…]}`
+* `GET /api/scores` → `{"scores":[{"name","score","level","difficulty","date"}, …]}` (top 10)
+* `POST /api/scores` with `{"name","score","level","difficulty"}` (difficulty is
+  optional and defaults to `normal`) → `{"rank":N,"scores":[…]}`
 
 Scores are validated for shape and range only; the game runs in the browser, so
 the table is not cheat-proof.

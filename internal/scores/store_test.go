@@ -16,7 +16,7 @@ func TestAddRankAndPersist(t *testing.T) {
 		score int
 		rank  int
 	}{{"ann", 500, 1}, {"bob", 900, 1}, {"cy", 700, 2}, {"dee", 500, 4}} {
-		rank, err := s.Add(c.name, c.score, 3)
+		rank, err := s.Add(c.name, c.score, 3, "")
 		if err != nil || rank != c.rank {
 			t.Errorf("Add(%s,%d) = %d, %v; want rank %d", c.name, c.score, rank, err, c.rank)
 		}
@@ -38,7 +38,7 @@ func TestValidation(t *testing.T) {
 		score, level int
 	}{{"", 10, 1}, {"  \n ", 10, 1}, {"x", 0, 1}, {"x", -5, 1}, {"x", MaxScore + 1, 1}, {"x", 10, 0}, {"x", 10, 36}}
 	for _, c := range bad {
-		if _, err := s.Add(c.name, c.score, c.level); err == nil {
+		if _, err := s.Add(c.name, c.score, c.level, "normal"); err == nil {
 			t.Errorf("Add(%q,%d,%d) should fail", c.name, c.score, c.level)
 		}
 	}
@@ -57,12 +57,25 @@ func TestCleanName(t *testing.T) {
 func TestTrim(t *testing.T) {
 	s, _ := Open("")
 	for i := 1; i <= keep+20; i++ {
-		s.Add("p", i, 1)
+		s.Add("p", i, 1, "easy")
 	}
 	if n := len(s.Top(1000)); n != keep {
 		t.Errorf("kept %d entries, want %d", n, keep)
 	}
-	if rank, _ := s.Add("low", 1, 1); rank != 0 {
+	if rank, _ := s.Add("low", 1, 1, "insane"); rank != 0 {
 		t.Errorf("score below the table should get rank 0, got %d", rank)
+	}
+}
+
+func TestDifficulty(t *testing.T) {
+	s, _ := Open("")
+	if _, err := s.Add("x", 10, 1, "godmode"); err == nil {
+		t.Error("unknown difficulty should be rejected")
+	}
+	s.Add("a", 10, 1, "")
+	s.Add("b", 20, 1, "insane")
+	top := s.Top(2)
+	if top[0].Difficulty != "insane" || top[1].Difficulty != "normal" {
+		t.Errorf("difficulty not stored: %+v", top)
 	}
 }

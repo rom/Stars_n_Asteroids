@@ -24,16 +24,28 @@ var (
 	snd = &audio{}
 )
 
-func down(codes ...string) bool {
-	for _, c := range codes {
-		if keys[c] {
+// down reports whether any key bound to the action is held.
+func down(a action) bool {
+	for _, c := range cfg.keys[a] {
+		if c != "" && keys[c] {
 			return true
 		}
 	}
-	return false
+	return keys["Touch:"+actNames[a]]
 }
 
-func hit(codes ...string) bool {
+// hit reports whether a key bound to the action went down this frame.
+func hit(a action) bool {
+	for _, c := range cfg.keys[a] {
+		if c != "" && pressed[c] {
+			return true
+		}
+	}
+	return pressed["Touch:"+actNames[a]]
+}
+
+// rawHit checks fixed (non-remappable) keys, used by the menus.
+func rawHit(codes ...string) bool {
 	for _, c := range codes {
 		if pressed[c] {
 			return true
@@ -90,16 +102,24 @@ func isTyping(e js.Value) bool {
 func setupInput() {
 	listen(win, "keydown", func(e js.Value) {
 		snd.unlock()
+		code := e.Get("code").String()
+		if settingsOpen {
+			settingsKeyDown(code, e)
+			return
+		}
 		if isTyping(e) {
 			return
 		}
-		code := e.Get("code").String()
 		if !e.Get("repeat").Bool() {
 			press(code)
 		}
 		switch code {
 		case "ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", "Space":
 			e.Call("preventDefault")
+		default:
+			if isBound(code) && !e.Get("ctrlKey").Bool() && !e.Get("metaKey").Bool() {
+				e.Call("preventDefault")
+			}
 		}
 	})
 	listen(win, "keyup", func(e js.Value) {
@@ -127,7 +147,7 @@ func setupInput() {
 	btns := doc.Call("querySelectorAll", ".tb")
 	for i := 0; i < btns.Length(); i++ {
 		b := btns.Index(i)
-		code := b.Get("dataset").Get("key").String()
+		code := "Touch:" + b.Get("dataset").Get("act").String()
 		listen(b, "pointerdown", func(e js.Value) {
 			snd.unlock()
 			e.Call("preventDefault")
@@ -158,6 +178,7 @@ func main() {
 		}
 	})
 	fetchScores()
+	setupSettings()
 	setupInput()
 	setupEntryForm()
 
@@ -170,7 +191,10 @@ func main() {
 			dt = math.Min(now-last, 0.05)
 		}
 		last = now
-		g.update(dt)
+		if !settingsOpen {
+			g.update(dt)
+		}
+		showGear(!settingsOpen && (g.st == stTitle || g.st == stPlay && g.paused))
 		g.draw()
 		snd.tick()
 		clear(pressed)
