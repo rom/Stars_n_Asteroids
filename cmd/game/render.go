@@ -7,6 +7,7 @@ import (
 	"strconv"
 
 	"stars_n_asteroids/internal/levels"
+	"stars_n_asteroids/internal/version"
 )
 
 const fontFace = `"Trebuchet MS", "Segoe UI", system-ui, sans-serif`
@@ -555,4 +556,5 @@ func (g *game) drawTitle() {
 		kl(actJump)+"  space jump     "+kl(actPause)+"  pause     "+kl(actMute)+"  mute", W/2, 644, 16, "#9fc4e8", "center")
 	text("Collect stars to raise your score multiplier.  Crystal asteroids explode - keep your distance, or use them.",
 		W/2, 670, 15, "#7f93b3", "center")
+	text(version.Version, W-14, H-12, 13, "#5f7190", "right")
 }

@@ -7,6 +7,7 @@ import (
 	"compress/gzip"
 	"encoding/json"
 	"flag"
+	"fmt"
 	"io/fs"
 	"log"
 	"mime"
@@ -20,6 +21,7 @@ import (
 	"time"
 
 	"stars_n_asteroids/internal/scores"
+	"stars_n_asteroids/internal/version"
 	"stars_n_asteroids/web"
 )
 
@@ -150,7 +152,12 @@ func main() {
 	host := flag.String("host", "", "interface to listen on (default: all interfaces)")
 	data := flag.String("data", "data/scores.json", "high-score file")
 	dir := flag.String("web", "", "serve client files from this directory instead of the embedded copy (development)")
+	showVersion := flag.Bool("version", false, "print the version and exit")
 	flag.Parse()
+	if *showVersion {
+		fmt.Println("stars_n_asteroids", version.Version)
+		return
+	}
 
 	store, err := scores.Open(*data)
 	if err != nil {
@@ -178,6 +185,6 @@ func main() {
 		Handler:           newMux(store, static),
 		ReadHeaderTimeout: 10 * time.Second,
 	}
-	log.Printf("Stars n Asteroids listening on http://%s", net.JoinHostPort(shown, strconv.Itoa(*port)))
+	log.Printf("Stars n Asteroids %s listening on http://%s", version.Version, net.JoinHostPort(shown, strconv.Itoa(*port)))
 	log.Fatal(srv.ListenAndServe())
 }

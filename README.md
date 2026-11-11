@@ -50,9 +50,20 @@ deploy. Options:
 | `-port` | `8080` (or `$PORT`) | TCP port to listen on                               |
 | `-host` | *(all interfaces)* | interface to bind, e.g. `127.0.0.1`                  |
 | `-data` | `data/scores.json` | high-score file                                      |
+| `-version` |                 | print the version and exit                           |
 | `-web`  | *(embedded)*       | serve client files from a directory (for development) |
 
 `make test` runs the unit tests and vets the WebAssembly client.
+
+## Releases
+
+Pre-built servers for Linux, macOS and Windows are attached to each
+[GitHub release](../../releases). Unpack one and run `stars_n_asteroids`; the
+game client is embedded in the binary.
+
+To cut a release: set `Version` in `internal/version/version.go`, add a section
+to `CHANGELOG.md`, and push a matching tag. The release workflow tests,
+cross-compiles (`make dist`) and publishes.
 
 ## How to play
 
