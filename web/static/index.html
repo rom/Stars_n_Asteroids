@@ -22,6 +22,25 @@
   #nameForm button { font: inherit; font-weight: bold; letter-spacing: .1em; padding: 9px 18px; border-radius: 8px; cursor: pointer;
     border: 1px solid #39d5ff; background: #39d5ff; color: #04101f; }
   #nameForm button.ghost { background: transparent; color: #9fc4e8; border-color: #44597a; }
+  #gearBtn { position: fixed; top: 12px; right: 12px; font: inherit; font-weight: bold; font-size: 13px; letter-spacing: .1em;
+    padding: 8px 14px; border-radius: 8px; cursor: pointer; border: 1px solid #b78cff; background: rgba(20, 12, 44, .8); color: #e3d2ff; }
+  #gearBtn.hidden, #settings.hidden { display: none; }
+  #settings { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; background: rgba(2, 3, 10, .75); }
+  #settings .panel { background: #0b1226; border: 2px solid #b78cff; border-radius: 14px; padding: 18px 24px; width: 600px; max-width: 92vw;
+    max-height: 92vh; box-sizing: border-box; overflow-y: auto; touch-action: pan-y; box-shadow: 0 0 40px rgba(183, 140, 255, .35); }
+  #settings h2 { margin: 0 0 4px; text-align: center; color: #ffd84a; letter-spacing: .15em; font-size: 20px; }
+  #settings h3 { margin: 14px 0 6px; font-size: 13px; letter-spacing: .15em; color: #b78cff; }
+  #settings p { margin: 6px 0 0; font-size: 12.5px; opacity: .8; min-height: 1.2em; }
+  #settings button, #settings select { font: inherit; font-size: 13px; font-weight: bold; padding: 7px 8px; border-radius: 7px; cursor: pointer;
+    border: 1px solid #44597a; background: #050a18; color: #cfe6ff; }
+  #settings button.on { background: #b78cff; border-color: #b78cff; color: #140a2c; }
+  #diffRow { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+  #keyRows { display: grid; grid-template-columns: 1fr 104px 104px 104px; gap: 5px 8px; align-items: center; font-size: 14px; }
+  #colorRows { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-top: 8px; }
+  #colorRows label { display: flex; flex-direction: column; align-items: center; gap: 3px; font-size: 12.5px; }
+  #colorRows input { width: 100%; height: 30px; padding: 0; border: 1px solid #44597a; border-radius: 6px; background: #050a18; cursor: pointer; }
+  #settings .row { margin-top: 16px; display: flex; gap: 10px; justify-content: flex-end; }
+  #settings #doneBtn { background: #39d5ff; border-color: #39d5ff; color: #04101f; padding: 8px 22px; }
   #touch { display: none; }
   @media (pointer: coarse) {
     #touch { display: block; }
@@ -48,12 +67,33 @@
   </form>
 </div>
 
+<button id="gearBtn" class="hidden" type="button">⚙ SETTINGS</button>
+<div id="settings" class="hidden">
+  <div class="panel">
+    <h2>SETTINGS</h2>
+    <h3>DIFFICULTY</h3>
+    <div id="diffRow"></div>
+    <p id="diffInfo"></p>
+    <h3>CONTROLS</h3>
+    <div id="keyRows"></div>
+    <p>Click a slot, then press the new key. Esc cancels, Backspace clears the slot.</p>
+    <h3>COLOURS</h3>
+    <select id="themeSel"></select>
+    <div id="colorRows"></div>
+    <div class="row">
+      <button id="resetBtn" type="button">RESET TO DEFAULTS</button>
+      <button id="doneBtn" type="button">DONE</button>
+    </div>
+  </div>
+</div>
+
 <div id="touch">
-  <div class="tb" data-key="ArrowLeft" style="left:16px">◀</div>
-  <div class="tb" data-key="ArrowRight" style="left:98px">▶</div>
-  <div class="tb small" data-key="KeyB" style="right:24px">BOMB</div>
-  <div class="tb" data-key="ArrowUp" style="right:98px">▲</div>
-  <div class="tb" data-key="Space" style="right:16px">●</div>
+  <div class="tb" data-act="left" style="left:16px">◀</div>
+  <div class="tb" data-act="right" style="left:98px">▶</div>
+  <div class="tb small" data-act="bomb" style="right:24px">BOMB</div>
+  <div class="tb small" data-act="jump" style="right:106px">JUMP</div>
+  <div class="tb" data-act="thrust" style="right:98px">▲</div>
+  <div class="tb" data-act="fire" style="right:16px">●</div>
 </div>
 
 <script src="wasm_exec.js"></script>

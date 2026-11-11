@@ -31,10 +31,10 @@ func TestAPI(t *testing.T) {
 	if code, out := post(`{"name":"ace","score":1200,"level":4}`); code != 201 || out.Rank != 1 || len(out.Scores) != 1 {
 		t.Errorf("post: %d %+v", code, out)
 	}
-	if code, out := post(`{"name":"zed","score":9000,"level":9}`); code != 201 || out.Rank != 1 || out.Scores[1].Name != "ace" {
+	if code, out := post(`{"name":"zed","score":9000,"level":9,"difficulty":"hard"}`); code != 201 || out.Rank != 1 || out.Scores[1].Name != "ace" || out.Scores[0].Difficulty != "hard" {
 		t.Errorf("post: %d %+v", code, out)
 	}
-	for _, bad := range []string{`{`, `{"name":"","score":5,"level":1}`, `{"name":"x","score":-1,"level":1}`, `{"name":"x","score":5,"level":77}`} {
+	for _, bad := range []string{`{`, `{"name":"","score":5,"level":1}`, `{"name":"x","score":-1,"level":1}`, `{"name":"x","score":5,"level":77}`, `{"name":"x","score":5,"level":1,"difficulty":"nope"}`} {
 		if code, _ := post(bad); code != 400 {
 			t.Errorf("post %s: got %d, want 400", bad, code)
 		}

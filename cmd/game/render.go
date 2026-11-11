@@ -7,6 +7,7 @@ import (
 	"strconv"
 
 	"stars_n_asteroids/internal/levels"
+	"stars_n_asteroids/internal/version"
 )
 
 const fontFace = `"Trebuchet MS", "Segoe UI", system-ui, sans-serif`
@@ -99,7 +100,7 @@ func drawShip(x, y, a, sc float64, flame bool, t float64) {
 		fill("#ffb347")
 	}
 	path(x, y, a, sc, shipHull)
-	fill("#1fa8d8")
+	fill(cfg.colors[cShip])
 	stroke("#d8f6ff", 1.6)
 	circle(x+math.Cos(a)*4*sc, y+math.Sin(a)*4*sc, 3.2*sc)
 	fill("#06283a")
@@ -173,7 +174,7 @@ func (g *game) draw() {
 		text("PRACTICE RUN - NOT RANKED", 16, H-14, 14, "#7f93b3", "left")
 	}
 	if snd.muted {
-		text("MUTED", W-16, H-14, 14, "#7f93b3", "right")
+		text("MUTED", W/2, H-14, 14, "#7f93b3", "center")
 	}
 }
 
@@ -201,7 +202,7 @@ func (g *game) drawWorld() {
 		pulse := 1 + 0.15*math.Sin(g.t*8+p.x)
 		if p.kind == pStar {
 			path(p.x, p.y, g.t*2+p.x, 11*pulse, starShape)
-			fill("#ffd84a")
+			fill(cfg.colors[cStar])
 			stroke("#fff6c9", 1.2)
 			continue
 		}
@@ -238,21 +239,36 @@ func (g *game) drawWorld() {
 			fill("#ffffff")
 			continue
 		}
+		// Tinted translucent body with a solid outline in the chosen colour.
+		col := cfg.colors[astColor[a.kind]]
+		ctx.Set("fillStyle", "#0a0d16")
+		ctx.Call("fill")
 		switch a.kind {
 		case kRock:
-			fill("#5d4c40")
-			stroke("#c9a98a", 2)
+			alpha(0.38)
+			fill(col)
+			alpha(1)
+			stroke(col, 2)
 		case kIce:
-			fill("rgba(120,205,255,0.45)")
-			stroke("#e4f8ff", 2)
+			alpha(0.5)
+			fill(col)
+			alpha(1)
+			stroke("#ffffff", 1.2)
+			stroke(col, 2.4)
 		case kIron:
-			fill("#3d4654")
-			stroke("#c5d0de", 3.5)
+			alpha(0.25)
+			fill(col)
+			alpha(1)
+			stroke(col, 3.8)
 			circle(a.x, a.y, a.r*0.35)
-			stroke("#7d8a9c", 2)
+			alpha(0.6)
+			stroke(col, 2)
+			alpha(1)
 		case kCrystal:
-			fill(hsl(305, 90, 45+12*math.Sin(g.t*7+a.x)))
-			stroke("#ffd6fb", 2)
+			alpha(0.6 + 0.25*math.Sin(g.t*7+a.x))
+			fill(col)
+			alpha(1)
+			stroke(col, 2.2)
 			circle(a.x, a.y, a.r*0.28)
 			fill("#ffffff")
 		}
@@ -264,22 +280,28 @@ func (g *game) drawWorld() {
 		switch e.kind {
 		case eDrone:
 			path(e.x, e.y, 0, 1, droneHull)
+			fill("#0a0d16")
 			if white {
 				fill("#ffffff")
 			} else {
-				fill("#8f2338")
+				alpha(0.55)
+				fill(cfg.colors[cEnemy])
+				alpha(1)
 			}
-			stroke("#ffb3bf", 1.8)
+			stroke(cfg.colors[cEnemy], 2)
 			circle(e.x, e.y, 4+1.5*math.Sin(e.t*9))
 			fill("#ffe07a")
 		case eHunter:
 			path(e.x, e.y, e.a, 1, hunterHull)
+			fill("#0a0d16")
 			if white {
 				fill("#ffffff")
 			} else {
-				fill("#c85a12")
+				alpha(0.8)
+				fill(cfg.colors[cEnemy])
+				alpha(1)
 			}
-			stroke("#ffd9a8", 1.8)
+			stroke("#ffffff", 1.4)
 		case eBoss:
 			for i := 0; i < 3; i++ {
 				a0 := -e.a*1.6 + float64(i)*tau/3
@@ -306,11 +328,11 @@ func (g *game) drawWorld() {
 	for _, b := range g.bullets {
 		if b.enemy {
 			circle(b.x, b.y, 5)
-			fill("#ff4d6d")
+			fill(cfg.colors[cEnemy])
 			circle(b.x, b.y, 2.2)
 			fill("#ffe1e6")
 		} else {
-			ctx.Set("strokeStyle", "#c9ffe9")
+			ctx.Set("strokeStyle", cfg.colors[cShot])
 			ctx.Set("lineWidth", 3.2)
 			ctx.Set("lineCap", "round")
 			ctx.Call("beginPath")
@@ -319,6 +341,23 @@ func (g *game) drawWorld() {
 			ctx.Call("stroke")
 		}
 	}
+
+	// Space-jump trails: a fading line and two collapsing rings.
+	for _, w := range g.warps {
+		k := w.t / 0.45
+		alpha(0.7 * (1 - k))
+		ctx.Call("setLineDash", []any{6, 10})
+		ctx.Call("beginPath")
+		ctx.Call("moveTo", w.x0, w.y0)
+		ctx.Call("lineTo", w.x1, w.y1)
+		stroke("#b78cff", 2)
+		ctx.Call("setLineDash", []any{})
+		circle(w.x0, w.y0, 6+40*k)
+		stroke("#b78cff", 3)
+		circle(w.x1, w.y1, 46-40*k)
+		stroke("#e3d2ff", 3)
+	}
+	alpha(1)
 
 	// Ship.
 	if s := &g.ship; s.alive && (s.inv <= 0 || math.Mod(g.t, 0.2) < 0.12) {
@@ -365,7 +404,7 @@ func (g *game) drawHUD() {
 		for i := 0; i < starsPerX; i++ {
 			path(70+float64(i)*16, 57, -math.Pi/2, 6, starShape)
 			if i < g.stars%starsPerX {
-				fill("#ffd84a")
+				fill(cfg.colors[cStar])
 			} else {
 				stroke("#6b6230", 1)
 			}
@@ -404,14 +443,34 @@ func (g *game) drawHUD() {
 		text("SHIELD", 18, y, 14, "#7df0ff", "left")
 	}
 
+	// Space-jump charge.
+	if s.alive {
+		const bw = 110.0
+		frac := 1 - s.jumpCool/jumpCooldown
+		col := "#b78cff"
+		label := "JUMP " + keyLabel(cfg.keys[actJump][0])
+		if frac < 1 {
+			col = "#6a5a8c"
+			label = "JUMP " + strconv.FormatFloat(s.jumpCool, 'f', 1, 64) + "s"
+		}
+		text(label, W-18-bw-10, H-18, 14, col, "right")
+		ctx.Set("fillStyle", "rgba(255,255,255,0.15)")
+		ctx.Call("fillRect", W-18-bw, H-28, bw, 8)
+		ctx.Set("fillStyle", col)
+		ctx.Call("fillRect", W-18-bw, H-28, bw*frac, 8)
+	}
+	if g.diff.id != "normal" {
+		text(g.diff.name, W/2, 66, 12, "#8fa9cc", "center")
+	}
+
 	// Guardian health.
 	for _, e := range g.enemies {
 		if e.kind == eBoss {
 			w := 420.0
 			ctx.Set("fillStyle", "rgba(255,255,255,0.15)")
-			ctx.Call("fillRect", W/2-w/2, 64, w, 10)
+			ctx.Call("fillRect", W/2-w/2, 74, w, 10)
 			ctx.Set("fillStyle", "#ff6bf0")
-			ctx.Call("fillRect", W/2-w/2, 64, w*float64(e.hp)/float64(e.maxhp), 10)
+			ctx.Call("fillRect", W/2-w/2, 74, w*float64(e.hp)/float64(e.maxhp), 10)
 		}
 	}
 }
@@ -435,7 +494,8 @@ func (g *game) drawBanners() {
 		ctx.Set("fillStyle", "rgba(2,3,10,0.6)")
 		ctx.Call("fillRect", 0, 0, W, H)
 		text("PAUSED", W/2, H/2, 64, "#ffffff", "center")
-		text("P to resume  -  M to mute", W/2, H/2+44, 20, "#9fc4e8", "center")
+		text(keyLabel(cfg.keys[actPause][0])+" / Esc to resume  -  O for settings", W/2, H/2+44, 20, "#9fc4e8", "center")
+		text("difficulty changes apply to the next game", W/2, H/2+72, 14, "#7f93b3", "center")
 	}
 }
 
@@ -477,10 +537,11 @@ func (g *game) drawTitle() {
 				col = "#ffffff"
 			}
 		}
-		text(strconv.Itoa(i+1)+".", W/2-205, y, 20, col, "right")
-		text(r.name, W/2-190, y, 20, col, "left")
-		text(commas(r.score), W/2+130, y, 20, col, "right")
-		text("L"+strconv.Itoa(r.level), W/2+205, y, 16, "#8fa9cc", "right")
+		text(strconv.Itoa(i+1)+".", W/2-245, y, 20, col, "right")
+		text(r.name, W/2-230, y, 20, col, "left")
+		text(commas(r.score), W/2+90, y, 20, col, "right")
+		text("L"+strconv.Itoa(r.level), W/2+150, y, 16, "#8fa9cc", "right")
+		text(diffShort(r.diff), W/2+165, y, 14, "#8fa9cc", "left")
 	}
 	if g.myRank > 10 {
 		text("your rank: "+strconv.Itoa(g.myRank), W/2, 250+10*28, 18, "#7dff9a", "center")
@@ -489,8 +550,11 @@ func (g *game) drawTitle() {
 	if math.Mod(g.t, 1.1) < 0.75 {
 		text("PRESS ENTER OR TAP TO START", W/2, 588, 28, "#ffffff", "center")
 	}
-	text("ARROWS / WASD  steer and thrust     SPACE  fire     B / SHIFT  nova bomb     P  pause     M  mute",
-		W/2, 640, 16, "#9fc4e8", "center")
+	text("DIFFICULTY: "+difficulties[cfg.diff].name+"     -     O  or  the gear button  for settings", W/2, 616, 16, "#b78cff", "center")
+	kl := func(a action) string { return keyLabel(cfg.keys[a][0]) }
+	text(kl(actLeft)+" "+kl(actRight)+"  steer     "+kl(actThrust)+"  thrust     "+kl(actFire)+"  fire     "+kl(actBomb)+"  nova bomb     "+
+		kl(actJump)+"  space jump     "+kl(actPause)+"  pause     "+kl(actMute)+"  mute", W/2, 644, 16, "#9fc4e8", "center")
 	text("Collect stars to raise your score multiplier.  Crystal asteroids explode - keep your distance, or use them.",
-		W/2, 668, 15, "#7f93b3", "center")
+		W/2, 670, 15, "#7f93b3", "center")
+	text(version.Version, W-14, H-12, 13, "#5f7190", "right")
 }

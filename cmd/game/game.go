@@ -14,12 +14,12 @@ const (
 	W, H = 1280.0, 720.0
 	tau  = 2 * math.Pi
 
-	startLives = 3
-	maxLives   = 6
-	maxBombs   = 3
-	maxMult    = 9
-	lifeEvery  = 30000
-	starsPerX  = 4 // stars needed to raise the multiplier
+	maxLives     = 6
+	maxBombs     = 3
+	maxMult      = 9
+	lifeEvery    = 30000
+	jumpCooldown = 5.0 // seconds between space jumps
+	starsPerX    = 4   // stars needed to raise the multiplier
 )
 
 type state int
@@ -64,6 +64,7 @@ type ship struct {
 	cool            float64 // gun cooldown
 	triple, rapid   float64 // power-up time left
 	respawn         float64
+	jumpCool        float64 // time until the next space jump
 }
 
 type asteroid struct {
@@ -116,6 +117,9 @@ type shock struct {
 	applied   bool
 }
 
+// warp is the visual trace of a space jump.
+type warp struct{ x0, y0, x1, y1, t float64 }
+
 type floater struct {
 	x, y, life float64
 	s, color   string
@@ -136,12 +140,14 @@ type game struct {
 	enemies []*enemy
 	shocks  []*shock
 	floats  []floater
+	warps   []warp
 	bg      []bgStar
 
 	score, lives, bombs int
 	mult, stars         int
 	nextLife            int
 
+	diff     difficulty // latched when a run starts
 	lvl      levels.Level
 	reached  int     // highest level reached this run
 	intro    float64 // level banner time left
@@ -167,6 +173,7 @@ func newGame() *game {
 	for i := 0; i < 110; i++ {
 		g.bg = append(g.bg, bgStar{rand.Float64() * W, rand.Float64() * H, 0.3 + rand.Float64()*0.7, rand.Float64() * tau})
 	}
+	g.diff = difficulties[cfg.diff]
 	g.lvl = levels.Get(1)
 	g.toTitle(false)
 	return g
@@ -195,6 +202,7 @@ func (g *game) clearWorld() {
 	g.asts, g.bullets, g.picks, g.enemies, g.shocks, g.floats = nil, nil, nil, nil, nil, nil
 	g.parts = g.parts[:0]
 	g.queue = nil
+	g.warps = nil
 }
 
 func (g *game) toTitle(refresh bool) {
@@ -217,7 +225,8 @@ func (g *game) toTitle(refresh bool) {
 func (g *game) start() {
 	g.clearWorld()
 	g.st = stPlay
-	g.score, g.lives, g.bombs = 0, startLives, 1
+	g.diff = difficulties[cfg.diff]
+	g.score, g.lives, g.bombs = 0, g.diff.lives, g.diff.bombs
 	g.mult, g.stars = 1, 0
 	g.nextLife = lifeEvery
 	g.won, g.asked = false, false
@@ -232,6 +241,12 @@ func (g *game) start() {
 
 func (g *game) startLevel(n int) {
 	g.lvl = levels.Get(n)
+	// Apply the difficulty setting to the level.
+	d := g.diff
+	g.lvl.Speed *= d.speed
+	g.lvl.Rocks = max(2, g.lvl.Rocks+d.extra)
+	g.lvl.SpawnEvery *= d.fire
+	g.lvl.BossHP = int(float64(g.lvl.BossHP) * d.boss)
 	g.reached = n
 	g.intro = 3
 	g.spawned = false
@@ -246,7 +261,7 @@ func (g *game) startLevel(n int) {
 }
 
 func (g *game) spawnShip() {
-	g.ship = ship{x: W / 2, y: H / 2, a: -math.Pi / 2, alive: true, inv: 3}
+	g.ship = ship{x: W / 2, y: H / 2, a: -math.Pi / 2, alive: true, inv: 3, shield: g.diff.shield}
 }
 
 // edgePoint picks a point on the border of the playfield away from the ship.
@@ -358,7 +373,7 @@ func (g *game) say(x, y float64, s, color string) {
 }
 
 func (g *game) addScore(pts int, x, y float64) {
-	pts *= g.mult
+	pts = int(math.Round(float64(pts*g.mult) * g.diff.score))
 	g.score += pts
 	g.say(x, y, "+"+strconv.Itoa(pts), "#ffffff")
 	for g.score >= g.nextLife {
@@ -373,7 +388,7 @@ func (g *game) addScore(pts int, x, y float64) {
 
 // ---------------------------------------------------------------- damage
 
-var astColor = [4]string{"#c9a98a", "#b9ecff", "#c5d0de", "#ff6bf0"}
+var astColor = [4]int{cRock, cIce, cIron, cCrystal}
 var astPoints = [4]int{20, 30, 45, 150}
 
 func (g *game) hitAsteroid(a *asteroid, dmg int) {
@@ -392,7 +407,7 @@ func (g *game) hitAsteroid(a *asteroid, dmg int) {
 		return
 	}
 	g.addScore(astPoints[a.kind]*(4-a.size), a.x, a.y)
-	g.burst(a.x, a.y, 8+a.size*6, 90+float64(a.size)*40, 0.8, 3, astColor[a.kind])
+	g.burst(a.x, a.y, 8+a.size*6, 90+float64(a.size)*40, 0.8, 3, cfg.colors[astColor[a.kind]])
 	g.shake = math.Max(g.shake, float64(a.size)*2.5)
 
 	switch a.kind {
@@ -480,7 +495,7 @@ func (g *game) hitEnemy(e *enemy, dmg int) {
 		}
 		return
 	}
-	g.burst(e.x, e.y, 26, 240, 0.8, 3, "#ff8a5c")
+	g.burst(e.x, e.y, 26, 240, 0.8, 3, cfg.colors[cEnemy])
 	g.shake = math.Max(g.shake, 7)
 	snd.boom(2)
 }
@@ -510,7 +525,7 @@ func (g *game) killShip() {
 	s.respawn = 2
 	g.lives--
 	g.mult, g.stars = 1, 0
-	g.burst(s.x, s.y, 50, 300, 1.3, 3, "#39d5ff")
+	g.burst(s.x, s.y, 50, 300, 1.3, 3, cfg.colors[cShip])
 	g.burst(s.x, s.y, 30, 180, 1.0, 3, "#ffffff")
 	g.shake = 18
 	snd.die()
@@ -566,21 +581,25 @@ func (g *game) update(dt float64) {
 			b.x += W
 		}
 	}
-	if hit("KeyM") {
+	if hit(actMute) {
 		snd.toggleMute()
 	}
 
 	switch g.st {
 	case stTitle:
 		g.updateAsteroids(dt)
-		if hit("Enter", "Space", "Tap") {
+		if rawHit("KeyO") {
+			openSettings()
+		} else if rawHit("Enter", "Space", "Tap") {
 			g.start()
 		}
 	case stPlay:
-		if g.dying == 0 && hit("KeyP", "Escape") {
+		if g.dying == 0 && (hit(actPause) || rawHit("Escape")) {
 			g.paused = !g.paused
 			snd.setThrust(false)
-		} else if g.paused && hit("Tap", "Enter") {
+		} else if g.paused && rawHit("KeyO") {
+			openSettings()
+		} else if g.paused && rawHit("Tap", "Enter") {
 			g.paused = false
 		}
 		if !g.paused {
@@ -599,7 +618,7 @@ func (g *game) update(dt float64) {
 				}
 				showEntry(title, "Score "+commas(g.score)+" - enter your name, pilot")
 			}
-		} else if g.asked && (g.score == 0 || g.practice > 1) && hit("Enter", "Space", "Tap") {
+		} else if g.asked && (g.score == 0 || g.practice > 1) && rawHit("Enter", "Space", "Tap") {
 			g.toTitle(true)
 		}
 	}
@@ -710,12 +729,15 @@ func (g *game) play(dt float64) {
 		g.floats[i].life -= dt
 		g.floats[i].y -= 28 * dt
 	}
+	for i := range g.warps {
+		g.warps[i].t += dt
+	}
 	g.compact()
 
 	// Level clear.
 	if g.spawned && g.clearT == 0 && g.dying == 0 && len(g.asts) == 0 && len(g.enemies) == 0 && len(g.queue) == 0 {
 		g.clearT = 3
-		bonus := 250 * l.Num
+		bonus := int(250 * float64(l.Num) * g.diff.score)
 		g.score += bonus
 		g.say(W/2, H/2+70, "LEVEL BONUS +"+commas(bonus), "#ffd84a")
 		if l.Num == levels.Count {
@@ -731,7 +753,7 @@ func (g *game) play(dt float64) {
 			g.clearT = 0
 			if l.Num == levels.Count {
 				g.won = true
-				g.score += g.lives * 5000
+				g.score += int(float64(g.lives*5000) * g.diff.score)
 				g.gameOver()
 			} else {
 				g.startLevel(l.Num + 1)
@@ -771,13 +793,13 @@ func (g *game) updateShip(dt float64) {
 		}
 		return
 	}
-	if down("ArrowLeft", "KeyA") {
+	if down(actLeft) {
 		s.a -= 4.4 * dt
 	}
-	if down("ArrowRight", "KeyD") {
+	if down(actRight) {
 		s.a += 4.4 * dt
 	}
-	s.thrust = down("ArrowUp", "KeyW")
+	s.thrust = down(actThrust)
 	snd.setThrust(s.thrust)
 	cs, sn := math.Cos(s.a), math.Sin(s.a)
 	if s.thrust {
@@ -804,7 +826,7 @@ func (g *game) updateShip(dt float64) {
 	s.triple = math.Max(0, s.triple-dt)
 	s.rapid = math.Max(0, s.rapid-dt)
 
-	if down("Space", "KeyK", "ControlLeft") && s.cool <= 0 {
+	if down(actFire) && s.cool <= 0 {
 		s.cool = 0.21
 		if s.rapid > 0 {
 			s.cool = 0.1
@@ -819,9 +841,75 @@ func (g *game) updateShip(dt float64) {
 		}
 		snd.shoot()
 	}
-	if g.bombs > 0 && hit("KeyB", "KeyX", "ShiftLeft", "ShiftRight") {
+	if g.bombs > 0 && hit(actBomb) {
 		g.detonateBomb()
 	}
+	s.jumpCool = math.Max(0, s.jumpCool-dt)
+	if hit(actJump) {
+		if s.jumpCool > 0 {
+			snd.denied()
+		} else {
+			g.spaceJump()
+		}
+	}
+}
+
+// clearance is the distance from (x, y) to the nearest object's edge.
+func (g *game) clearance(x, y float64) float64 {
+	c := math.Inf(1)
+	for _, a := range g.asts {
+		c = math.Min(c, math.Sqrt(dist2(x, y, a.x, a.y))-a.r)
+	}
+	for _, e := range g.enemies {
+		c = math.Min(c, math.Sqrt(dist2(x, y, e.x, e.y))-e.r)
+	}
+	for _, b := range g.bullets {
+		if b.enemy {
+			c = math.Min(c, math.Sqrt(dist2(x, y, b.x, b.y))-5)
+		}
+	}
+	for _, s := range g.shocks {
+		if !s.friendly {
+			c = math.Min(c, math.Sqrt(dist2(x, y, s.x, s.y))-s.max)
+		}
+	}
+	for _, p := range g.picks {
+		c = math.Min(c, math.Sqrt(dist2(x, y, p.x, p.y))-12)
+	}
+	return c
+}
+
+// spaceJump wormholes the ship to the emptiest spot found on screen: a place
+// with no object nearby. The ship arrives at rest.
+func (g *game) spaceJump() {
+	s := &g.ship
+	const want = 130.0 // clear radius we are happy with
+	bx, by, best := s.x, s.y, -1.0
+	for i := 0; i < 160; i++ {
+		x := 50 + rand.Float64()*(W-100)
+		y := 60 + rand.Float64()*(H-120)
+		if dist2(x, y, s.x, s.y) < 220*220 {
+			continue // a jump should actually go somewhere
+		}
+		if c := g.clearance(x, y); c > best {
+			bx, by, best = x, y, c
+			if c >= want && i >= 30 {
+				break
+			}
+		}
+	}
+	if best < 24 { // screen is packed solid: no free spot to arrive in
+		snd.denied()
+		g.say(s.x, s.y-34, "NO CLEAR SPACE", "#ff8a8a")
+		s.jumpCool = 0.5
+		return
+	}
+	g.warps = append(g.warps, warp{s.x, s.y, bx, by, 0})
+	g.burst(s.x, s.y, 26, 220, 0.5, 3, "#b78cff")
+	s.x, s.y, s.vx, s.vy = bx, by, 0, 0
+	g.burst(bx, by, 26, 220, 0.5, 3, "#b78cff")
+	s.jumpCool = jumpCooldown
+	snd.jump()
 }
 
 func (g *game) updateAsteroids(dt float64) {
@@ -863,7 +951,8 @@ func (g *game) enemyFire(x, y, ang, speed float64) {
 func (g *game) updateEnemies(dt float64) {
 	l := g.lvl
 	s := &g.ship
-	bs := 230 + float64(l.Num)*3.5 // enemy bullet speed
+	bs := (230 + float64(l.Num)*3.5) * g.diff.bullet // enemy bullet speed
+	fr := g.diff.fire                                // cooldown scale
 	for _, e := range g.enemies {
 		e.t += dt
 		e.flash -= dt
@@ -873,7 +962,7 @@ func (g *game) updateEnemies(dt float64) {
 			e.vy = 75 * math.Cos(e.t*1.7)
 			e.cool -= dt
 			if e.cool <= 0 && s.alive {
-				e.cool = math.Max(1.1, 2.6-float64(l.Num)*0.04)
+				e.cool = math.Max(1.1, 2.6-float64(l.Num)*0.04) * fr
 				spread := math.Max(0.06, 0.5-float64(l.Num)*0.013)
 				g.enemyFire(e.x, e.y, aim+(rand.Float64()-0.5)*spread, bs)
 				snd.enemyShoot()
@@ -904,14 +993,14 @@ func (g *game) updateEnemies(dt float64) {
 			e.cool2 -= dt
 			e.cl3 -= dt
 			if e.cool <= 0 {
-				e.cool = 1.5 - float64(tier)*0.15
+				e.cool = (1.5 - float64(tier)*0.15) * fr
 				for i := -1; i <= 1; i++ {
 					g.enemyFire(e.x, e.y, aim+float64(i)*0.22, bs)
 				}
 				snd.enemyShoot()
 			}
 			if e.cool2 <= 0 {
-				e.cool2 = 4.5 - float64(tier)*0.3
+				e.cool2 = (4.5 - float64(tier)*0.3) * fr
 				n := 10 + tier*3
 				off := rand.Float64() * tau
 				for i := 0; i < n; i++ {
@@ -920,7 +1009,7 @@ func (g *game) updateEnemies(dt float64) {
 				snd.boom(1)
 			}
 			if e.cl3 <= 0 {
-				e.cl3 = 7 - float64(tier)*0.6
+				e.cl3 = (7 - float64(tier)*0.6) * fr
 				if len(g.asts) < 9 {
 					kind := kRock
 					if tier >= 2 && rand.Intn(2) == 0 {
@@ -977,7 +1066,7 @@ func (g *game) collect(p *pickup) {
 			g.say(s.x, s.y-34, "MULTIPLIER x"+strconv.Itoa(g.mult), "#ffd84a")
 		}
 		g.addScore(50, p.x, p.y)
-		g.burst(p.x, p.y, 8, 120, 0.4, 2, "#ffd84a")
+		g.burst(p.x, p.y, 8, 120, 0.4, 2, cfg.colors[cStar])
 		snd.star(g.mult)
 		return
 	case pTriple:
@@ -1039,6 +1128,13 @@ func (g *game) compact() {
 		}
 	}
 	g.floats = fl
+	w := g.warps[:0]
+	for _, x := range g.warps {
+		if x.t < 0.45 {
+			w = append(w, x)
+		}
+	}
+	g.warps = w
 }
 
 func commas(n int) string {

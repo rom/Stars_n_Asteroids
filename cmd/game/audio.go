@@ -259,6 +259,23 @@ func (a *audio) bomb() {
 	a.noise(a.sfx, "lowpass", 5000, 80, t+0.3, 1.0, 0.4)
 }
 
+func (a *audio) jump() {
+	if !a.ok {
+		return
+	}
+	t := a.now()
+	a.tone(a.sfx, "sine", 180, 2400, t, 0.01, 0.22, 0.22)
+	a.tone(a.sfx, "triangle", 2400, 260, t+0.2, 0.01, 0.3, 0.2)
+	a.noise(a.sfx, "bandpass", 500, 6000, t, 0.25, 0.15)
+}
+
+func (a *audio) denied() {
+	if !a.ok {
+		return
+	}
+	a.tone(a.sfx, "square", 140, 110, a.now(), 0.005, 0.12, 0.1)
+}
+
 func (a *audio) bossWarn() {
 	if !a.ok {
 		return
